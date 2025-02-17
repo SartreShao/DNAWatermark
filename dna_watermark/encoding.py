@@ -26,7 +26,8 @@ NUMBERS = {
 # 标点符号编码表
 PUNCTUATION = {
     '.': 'TGA', ',': 'TCT', '?': 'TGC', '!': 'TGG', '-': 'AAC', '_': 'AAG',
-    '(': 'AAT', ')': 'ATA', '[': 'ATC', ']': 'ATT', '@': 'CCC', '/': 'CCG'
+    '(': 'AAT', ')': 'ATA', '[': 'ATC', ']': 'ATT', '@': 'CCC', '/': 'CCG',
+    ' ': 'AAA'  # 空格字符使用 AAA 编码
 }
 
 # 合并所有编码表
