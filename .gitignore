@@ -45,13 +45,6 @@ cover/
 *.swo
 .DS_Store
 
-# Project specific
-*.fasta
-*.gb
-*.genbank
-*.dna
-test_data/
-
 # Environment
 .env
 .venv
