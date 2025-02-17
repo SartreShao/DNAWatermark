@@ -18,9 +18,46 @@
 poetry install
 ```
 
-## 使用方法
+## 运行服务
 
-待补充...
+1. 启动API服务：
+```bash
+# 在独立的终端窗口中运行
+poetry run python run.py
+```
+
+2. 停止服务：
+   - 如果在终端窗口运行：直接按 Ctrl+C
+   - 如果在后台运行：使用 `taskkill /F /IM python.exe`
+
+服务默认在以下地址运行：
+- http://localhost:5000
+
+## API使用说明
+
+1. 健康检查
+```bash
+curl http://localhost:5000/api/health
+```
+
+2. 嵌入水印
+```bash
+curl -X POST http://localhost:5000/api/watermark/embed \
+     -H "Content-Type: application/json" \
+     -d '{
+           "sequence": "ATCGATCGATCGATCG",
+           "message": "test_user"
+         }'
+```
+
+3. 提取水印
+```bash
+curl -X POST http://localhost:5000/api/watermark/extract \
+     -H "Content-Type: application/json" \
+     -d '{
+           "sequence": "ATATCGGATCTGATCG"
+         }'
+```
 
 ## 开发
 
@@ -35,6 +72,28 @@ poetry run pytest
 poetry run black .
 poetry run isort .
 ```
+
+## API响应格式
+
+所有API响应都遵循以下格式：
+```json
+{
+    "success": true,
+    "data": "结果数据",
+    "message": "操作说明"
+}
+```
+
+## 注意事项
+
+1. 开发环境运行
+   - 服务默认以开发模式运行
+   - 不要在生产环境使用开发服务器
+   - 生产环境请使用 WSGI 服务器（如 Gunicorn）
+
+2. 安全性
+   - API服务默认允许所有来源的CORS请求
+   - 生产环境部署时请配置适当的CORS策略
 
 ## 许可证
 
