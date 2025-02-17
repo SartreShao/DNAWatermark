@@ -10,7 +10,7 @@ SAFE-DNA Encoding System
 
 # 字母编码表（A-Z）
 LETTERS = {
-    'A': 'ACC', 'B': 'AGT', 'C': 'CAT', 'D': 'CCA', 'E': 'CCG', 'F': 'CGA',
+    'A': 'ACC', 'B': 'AGT', 'C': 'CAT', 'D': 'CCA', 'E': 'CGT', 'F': 'CGA',
     'G': 'CGC', 'H': 'CGG', 'I': 'CTA', 'J': 'CTC', 'K': 'CTG', 'L': 'GAC',
     'M': 'GCA', 'N': 'GCC', 'O': 'GCG', 'P': 'GCT', 'Q': 'GGA', 'R': 'GGC',
     'S': 'GGG', 'T': 'GTC', 'U': 'GTT', 'V': 'TAA', 'W': 'TAG', 'X': 'TCA',
@@ -26,7 +26,7 @@ NUMBERS = {
 # 标点符号编码表
 PUNCTUATION = {
     '.': 'TGA', ',': 'TCT', '?': 'TGC', '!': 'TGG', '-': 'AAC', '_': 'AAG',
-    '(': 'AAT', ')': 'ATA', '[': 'ATC', ']': 'ATT', '@': 'CCC', '/': 'CCG',
+    '(': 'AAT', ')': 'ATA', '[': 'ATC', ']': 'ATT', '@': 'CCC', '/': 'GAG',
     ' ': 'AAA'  # 空格字符使用 AAA 编码
 }
 
