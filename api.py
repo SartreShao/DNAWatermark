@@ -7,11 +7,12 @@ app = Flask(__name__)
 CORS(app)
 
 # 导入路由
-from route import watermark_routes, health_routes
+from route import watermark_routes, health_routes, genbank_routes
 
 # 注册路由
 app.register_blueprint(watermark_routes.bp)
 app.register_blueprint(health_routes.bp)
+app.register_blueprint(genbank_routes.bp)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
