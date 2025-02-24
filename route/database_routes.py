@@ -151,6 +151,12 @@ def get_all_watermarks():
         # 转换为JSON格式
         result = []
         for record in records:
+            # 处理换行符
+            original_genbank = record.original_genbank.replace('\\n', '\n') if record.original_genbank else None
+            watermarked_genbank = record.watermarked_genbank.replace('\\n', '\n') if record.watermarked_genbank else None
+            original_sequence = record.original_sequence.replace('\\n', '\n') if record.original_sequence else None
+            watermarked_sequence = record.watermarked_sequence.replace('\\n', '\n') if record.watermarked_sequence else None
+            
             result.append({
                 "id": record.id,
                 "object_id": record.object_id,
@@ -161,10 +167,10 @@ def get_all_watermarks():
                 "password": record.password,
                 "watermark_sequence": record.watermark_sequence,
                 "position": record.position,
-                "original_sequence": record.original_sequence,
-                "watermarked_sequence": record.watermarked_sequence,
-                "original_genbank": record.original_genbank,
-                "watermarked_genbank": record.watermarked_genbank,
+                "original_sequence": original_sequence,
+                "watermarked_sequence": watermarked_sequence,
+                "original_genbank": original_genbank,
+                "watermarked_genbank": watermarked_genbank,
                 "genbank_accession": record.genbank_accession,
                 "genbank_organism": record.genbank_organism,
                 "genbank_definition": record.genbank_definition
