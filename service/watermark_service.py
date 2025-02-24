@@ -69,6 +69,56 @@ def insert_watermark_to_genbank(
         print(f"发生错误: {str(e)}")  # 调试信息
         raise
 
+def extract_watermark_from_genbank(
+    watermark_sequence: str,
+    algorithm: str,
+    password: str | None = None
+) -> Dict[str, Any]:
+    """从水印序列中提取水印文本
+    
+    Args:
+        watermark_sequence: 水印 DNA 序列
+        algorithm: 水印算法类型 ("plaintext" 或 "encrypted")
+        password: 解密密码（仅在加密模式下需要）
+        
+    Returns:
+        包含水印信息的字典
+        
+    Raises:
+        ValueError: 当无法提取水印或解密失败时
+    """
+    try:
+        print(f"开始提取水印，算法：{algorithm}")  # 调试信息
+        
+        # 验证算法类型
+        validate_algorithm_type(algorithm)
+        
+        # 提取水印文本
+        try:
+            if algorithm == "plaintext":
+                print("使用明文模式解码...")  # 调试信息
+                watermark_text = encoding.decode_dna(watermark_sequence)
+            else:  # encrypted
+                print("使用加密模式解码...")  # 调试信息
+                if not password:
+                    raise ValueError("加密水印需要提供密码")
+                watermark_text = encoding.decode_encrypted_dna(watermark_sequence, password)
+            
+            print(f"成功提取水印文本：{watermark_text}")  # 调试信息
+            
+            return {
+                "watermarkText": watermark_text,
+                "algorithm": algorithm
+            }
+            
+        except Exception as e:
+            print(f"水印解码失败：{str(e)}")  # 调试信息
+            raise ValueError(f"水印解码失败：{str(e)}")
+            
+    except Exception as e:
+        print(f"提取水印过程中发生错误：{str(e)}")  # 调试信息
+        raise ValueError(f"提取水印失败：{str(e)}")
+
 def validate_algorithm_type(algorithm: str) -> None:
     """验证算法类型
     

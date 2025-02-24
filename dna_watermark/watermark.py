@@ -77,12 +77,11 @@ def insert_watermark(
         if algorithm == "plaintext":
             print("使用明文算法生成水印")  # 调试信息
             watermark_dna = encoding.encode_text(watermark_text)
-            salt = None
         else:  # encrypted
             print(f"使用加密算法生成水印，密码：{'已提供' if password else '未提供'}")  # 调试信息
             if not isinstance(password, str):
                 raise ValueError("加密模式需要提供有效的密码字符串")
-            watermark_dna, salt = encoding.encode_encrypted_text(watermark_text, password)
+            watermark_dna = encoding.encode_encrypted_text(watermark_text, password)
         
         print(f"生成的水印序列长度：{len(watermark_dna)}")  # 调试信息
         
@@ -101,8 +100,7 @@ def insert_watermark(
             watermark_text,
             watermark_dna,
             insert_position,
-            algorithm,
-            salt
+            algorithm
         )
         
         # 使用 BioPython 更新 Genbank 文件
@@ -154,8 +152,7 @@ def create_watermark_info(
     original_text: str,
     watermark_dna: str,
     insert_position: int,
-    algorithm: str,
-    salt: bytes | None = None
+    algorithm: str
 ) -> Dict[str, Any]:
     """
     创建水印信息字典。
@@ -165,7 +162,6 @@ def create_watermark_info(
         watermark_dna: 编码后的水印 DNA 序列
         insert_position: 插入位置
         algorithm: 水印算法类型
-        salt: 加密盐值（仅在加密模式下使用）
 
     Returns:
         包含水印信息的字典
@@ -180,9 +176,6 @@ def create_watermark_info(
         "algorithm": algorithm
     }
     
-    if salt is not None:
-        info["salt"] = salt.hex()  # 将字节转换为十六进制字符串
-        
     return info
 
 def update_genbank_content(
@@ -343,4 +336,142 @@ def update_genbank_content(
     # 移除末尾多余的空白字符，确保文件以 // 结束
     result = output.getvalue().rstrip()
     
-    return result 
+    return result
+
+def extract_watermark(
+    genbank_data: str,
+    password: str | None = None,
+    salt: bytes | None = None
+) -> Dict[str, Any]:
+    """
+    从 GenBank 文件中提取水印。
+
+    Args:
+        genbank_data: GenBank 文件内容
+        password: 解密密码（仅在加密模式下需要）
+        salt: 盐值（仅在加密模式下需要）
+
+    Returns:
+        包含水印信息的字典
+
+    Raises:
+        ValueError: 当无法找到水印或解密失败时
+    """
+    try:
+        print("开始提取水印...")  # 调试信息
+        
+        # 预处理 GenBank 文件内容
+        print("正在预处理 GenBank 文件...")  # 调试信息
+        # 修复缩进问题
+        lines = genbank_data.split('\n')
+        processed_lines = []
+        for line in lines:
+            # 修复特征限定符的缩进
+            if line.strip().startswith('/'):
+                line = ' ' * 21 + line.lstrip()
+            processed_lines.append(line)
+        processed_genbank = '\n'.join(processed_lines)
+        
+        # 解析 GenBank 文件
+        print("正在解析 GenBank 文件...")  # 调试信息
+        try:
+            record = SeqIO.read(StringIO(processed_genbank), "genbank")
+            print(f"成功解析 GenBank 文件，序列长度：{len(record.seq)}")  # 调试信息
+        except Exception as e:
+            print(f"GenBank 文件解析失败：{str(e)}")  # 调试信息
+            raise ValueError(f"GenBank 文件解析失败：{str(e)}")
+        
+        # 查找水印特征
+        print("正在查找水印特征...")  # 调试信息
+        watermark_feature = None
+        for feature in record.features:
+            print(f"检查特征：{feature.type}")  # 调试信息
+            if feature.type.lower().replace(' ', '') == "watermark":
+                watermark_feature = feature
+                break
+        
+        if not watermark_feature:
+            # 尝试通过注释查找水印信息
+            print("通过常规特征未找到水印，尝试从注释中查找...")  # 调试信息
+            if "comment" in record.annotations:
+                comment = record.annotations["comment"]
+                if "DNA watermark information" in comment:
+                    # 从注释中提取水印信息
+                    import re
+                    position_match = re.search(r"Position: (\d+)\.\.(\d+)", comment)
+                    sequence_match = re.search(r"Sequence:\s*([actgACTG\s]+)", comment)
+                    
+                    if position_match and sequence_match:
+                        start = int(position_match.group(1)) - 1  # 转换为0基索引
+                        end = int(position_match.group(2))
+                        sequence = sequence_match.group(1).replace(' ', '').lower()
+                        
+                        # 创建水印特征
+                        watermark_feature = SeqFeature(
+                            FeatureLocation(start, end),
+                            type="watermark",
+                            qualifiers={
+                                "watermark_type": ["plaintext"]
+                            }
+                        )
+                        print(f"从注释中找到水印信息：位置 {start+1}..{end}")  # 调试信息
+        
+        if not watermark_feature:
+            print("未找到水印特征")  # 调试信息
+            raise ValueError("未找到水印特征")
+        
+        print(f"找到水印特征，位置：{watermark_feature.location}")  # 调试信息
+        
+        # 获取水印信息
+        algorithm = watermark_feature.qualifiers.get("watermark_type", ["plaintext"])[0]
+        print(f"水印算法类型：{algorithm}")  # 调试信息
+        
+        # 获取序列
+        if watermark_feature.location:
+            # 使用 str() 转换位置对象，然后再转为整数
+            start = int(str(watermark_feature.location.start))
+            end = int(str(watermark_feature.location.end))
+        else:
+            # 如果位置信息不可用，尝试从注释中获取
+            print("特征位置不可用，尝试从注释中获取...")  # 调试信息
+            for note in watermark_feature.qualifiers.get("note", []):
+                position_match = re.search(r"Position: (\d+)\.\.(\d+)", note)
+                if position_match:
+                    start = int(position_match.group(1)) - 1
+                    end = int(position_match.group(2))
+                    break
+            else:
+                raise ValueError("无法确定水印位置")
+        
+        sequence = str(record.seq[start:end])
+        print(f"水印序列：{sequence}")  # 调试信息
+        
+        # 提取水印文本
+        try:
+            if algorithm == "plaintext":
+                print("使用明文模式解码...")  # 调试信息
+                watermark_text = encoding.decode_dna(sequence)
+            else:  # encrypted
+                print("使用加密模式解码...")  # 调试信息
+                if not password:
+                    raise ValueError("加密水印需要提供密码")
+                watermark_text = encoding.decode_encrypted_dna(sequence, password)
+            
+            print(f"成功提取水印文本：{watermark_text}")  # 调试信息
+        except Exception as e:
+            print(f"水印解码失败：{str(e)}")  # 调试信息
+            raise ValueError(f"水印解码失败：{str(e)}")
+
+        return {
+            "watermark_text": watermark_text,
+            "position": {
+                "start": start,
+                "end": end
+            },
+            "sequence": sequence,
+            "algorithm": algorithm
+        }
+        
+    except Exception as e:
+        print(f"提取水印过程中发生错误：{str(e)}")  # 调试信息
+        raise ValueError(f"提取水印失败：{str(e)}") 

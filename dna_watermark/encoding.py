@@ -127,72 +127,85 @@ def get_all_valid_triplets() -> set:
     """
     return set(DECODING_TABLE.keys())
 
-def generate_encryption_key(password: str, salt: bytes | None = None) -> tuple[bytes, bytes]:
+def encrypt_text(text: str, password: str) -> str:
     """
-    使用密码生成加密密钥。
-    
-    Args:
-        password: 用于生成密钥的密码
-        salt: 可选的盐值，如果不提供则随机生成
-        
-    Returns:
-        元组 (密钥, 盐值)
-    """
-    if salt is None:
-        salt = random.randbytes(16)
-        
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-    )
-    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-    return key, salt
-
-def encrypt_text(text: str, password: str) -> tuple[str, bytes]:
-    """
-    加密文本。
+    使用简单的替换加密文本。
     
     Args:
         text: 要加密的文本
         password: 加密密码
         
     Returns:
-        元组 (加密后的文本, 盐值)
+        加密后的文本
     """
-    key, salt = generate_encryption_key(password)
-    f = Fernet(key)
-    encrypted_data = f.encrypt(text.encode())
-    # 使用 urlsafe_b64encode 并移除填充字符 '='
-    encoded = base64.urlsafe_b64encode(encrypted_data).decode().rstrip('=')
-    # 将 '-' 和 '_' 替换为我们支持的字符
-    encoded = encoded.replace('-', '.')
-    encoded = encoded.replace('_', '/')
-    return encoded, salt
+    # 获取所有可用字符
+    available_chars = list(ENCODING_TABLE.keys())
+    char_count = len(available_chars)
+    
+    # 使用密码生成偏移量
+    password_len = len(password)
+    
+    # 加密过程：对每个字符在可用字符集中进行偏移
+    encrypted_chars = []
+    for i, c in enumerate(text):
+        if c.upper() not in available_chars:
+            raise ValueError(f"不支持的字符：{c}")
+        
+        # 在可用字符集中找到当前字符的位置
+        current_index = available_chars.index(c.upper())
+        
+        # 使用密码中对应位置的字符的ASCII值作为偏移量
+        password_char = password[i % password_len]
+        offset = sum(ord(c) for c in password[:i % password_len + 1]) % char_count
+        
+        # 计算偏移后的位置
+        new_index = (current_index + offset) % char_count
+        
+        # 获取加密后的字符
+        encrypted_char = available_chars[new_index]
+        encrypted_chars.append(encrypted_char)
+    
+    return ''.join(encrypted_chars)
 
-def decrypt_text(encrypted_text: str, password: str, salt: bytes) -> str:
+def decrypt_text(encrypted_text: str, password: str) -> str:
     """
     解密文本。
     
     Args:
         encrypted_text: 加密后的文本
         password: 解密密码
-        salt: 加密时使用的盐值
         
     Returns:
         解密后的原始文本
     """
-    # 还原 base64 字符
-    padded_text = encrypted_text.replace('.', '-').replace('/', '_')
-    # 添加回 base64 填充
-    padding_length = (4 - len(padded_text) % 4) % 4
-    padded_text += '=' * padding_length
+    # 获取所有可用字符
+    available_chars = list(ENCODING_TABLE.keys())
+    char_count = len(available_chars)
     
-    key, _ = generate_encryption_key(password, salt)
-    f = Fernet(key)
-    encrypted_data = base64.urlsafe_b64decode(padded_text.encode())
-    return f.decrypt(encrypted_data).decode()
+    # 使用密码生成偏移量
+    password_len = len(password)
+    
+    # 解密过程：对每个字符在可用字符集中进行反向偏移
+    decrypted_chars = []
+    for i, c in enumerate(encrypted_text):
+        if c not in available_chars:
+            raise ValueError(f"不支持的字符：{c}")
+            
+        # 在可用字符集中找到当前字符的位置
+        current_index = available_chars.index(c)
+        
+        # 使用密码中对应位置的字符的ASCII值作为偏移量
+        password_char = password[i % password_len]
+        offset = sum(ord(c) for c in password[:i % password_len + 1]) % char_count
+        
+        # 计算反向偏移后的位置
+        new_index = (current_index - offset) % char_count
+        
+        # 获取解密后的字符
+        decrypted_char = available_chars[new_index]
+        decrypted_chars.append(decrypted_char)
+    
+    return ''.join(decrypted_chars)
 
 def generate_noise_sequence(length: int) -> str:
     """
@@ -207,7 +220,7 @@ def generate_noise_sequence(length: int) -> str:
     bases = ['A', 'T', 'C', 'G']
     return ''.join(random.choice(bases) for _ in range(length))
 
-def encode_encrypted_text(text: str, password: str) -> tuple[str, bytes]:
+def encode_encrypted_text(text: str, password: str) -> str:
     """
     将文本加密并编码为 DNA 序列。
     
@@ -216,71 +229,76 @@ def encode_encrypted_text(text: str, password: str) -> tuple[str, bytes]:
         password: 加密密码
         
     Returns:
-        元组 (编码后的 DNA 序列, 盐值)
+        编码后的 DNA 序列
     """
     # 加密文本
-    encrypted_text, salt = encrypt_text(text, password)
+    encrypted_text = encrypt_text(text, password)
     
     # 编码加密后的文本
     dna_sequence = encode_text(encrypted_text)
     
-    # 添加随机噪音序列
-    noise_length = random.randint(10, 30)
-    prefix_noise = generate_noise_sequence(noise_length)
-    suffix_noise = generate_noise_sequence(noise_length)
-    
-    return f"{prefix_noise}{dna_sequence}{suffix_noise}", salt
+    # 不再添加随机噪声序列，直接返回编码后的序列
+    return dna_sequence
 
-def decode_encrypted_dna(dna_sequence: str, password: str, salt: bytes) -> str:
+def decode_encrypted_dna(dna_sequence: str, password: str) -> str:
     """
     解码并解密 DNA 序列。
     
     Args:
         dna_sequence: 编码后的 DNA 序列
         password: 解密密码
-        salt: 加密时使用的盐值
         
     Returns:
         解密后的原始文本
+        
+    Raises:
+        ValueError: 如果解码或解密失败
     """
-    # 移除噪音序列（假设真实序列长度是3的倍数）
-    sequence_length = len(dna_sequence)
-    for i in range(sequence_length):
-        for j in range(i + 1, sequence_length + 1):
-            sub_sequence = dna_sequence[i:j]
-            if len(sub_sequence) % 3 == 0:
-                try:
-                    # 尝试解码
-                    encrypted_text = decode_dna(sub_sequence)
-                    # 尝试解密
-                    return decrypt_text(encrypted_text, password, salt)
-                except:
-                    continue
-    raise ValueError("无法解码序列")
+    try:
+        # 去除空白并转换为大写
+        sequence = dna_sequence.strip().upper()
+        
+        print(f"解码序列：{sequence}，长度：{len(sequence)}")  # 调试信息
+        
+        # 确保序列长度是3的倍数
+        if len(sequence) % 3 != 0:
+            raise ValueError(f"DNA序列长度必须是3的倍数，当前长度：{len(sequence)}")
+            
+        # 直接尝试解码整个序列
+        encrypted_text = decode_dna(sequence)
+        print(f"解码后的加密文本：{encrypted_text}")  # 调试信息
+        
+        # 解密文本
+        decrypted_text = decrypt_text(encrypted_text, password)
+        print(f"解密后的文本：{decrypted_text}")  # 调试信息
+        
+        return decrypted_text
+        
+    except Exception as e:
+        raise ValueError(f"解密失败：{str(e)}")
 
-def generate_secure_password(length: int = 16) -> str:
+def generate_secure_password(length: int = 8) -> str:
     """
     生成一个安全的随机密码。
     
     Args:
-        length: 密码长度，默认16位
+        length: 密码长度，默认8位
         
     Returns:
         生成的安全密码
     """
-    # 定义可用的字符集（只使用编码表中支持的字符）
-    available_chars = list(ENCODING_TABLE.keys())
+    # 只使用字母和数字，避免特殊字符
+    password_chars = list(LETTERS.keys()) + list(NUMBERS.keys())
     
-    # 确保至少包含一个字母、一个数字和一个标点符号
+    # 确保至少包含一个字母和一个数字
     password = [
-        random.choice(list(LETTERS.keys())),  # 一个字母
-        random.choice(list(NUMBERS.keys())),  # 一个数字
-        random.choice(list(PUNCTUATION.keys()))  # 一个标点符号
+        random.choice(list(LETTERS.keys())),   # 一个字母
+        random.choice(list(NUMBERS.keys()))    # 一个数字
     ]
     
     # 填充剩余长度
     remaining_length = length - len(password)
-    password.extend(random.choice(available_chars) for _ in range(remaining_length))
+    password.extend(random.choice(password_chars) for _ in range(remaining_length))
     
     # 打乱密码字符顺序
     random.shuffle(password)
