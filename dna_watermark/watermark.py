@@ -5,13 +5,34 @@ DNA Watermark Insertion Module
 采用纯函数式编程方式实现，确保函数的输入输出可预测性。
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from io import StringIO
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 from . import encoding
+
+def get_insertion_position(position_strategy: str, cds_region: Dict[str, int]) -> int:
+    """
+    根据策略确定水印插入位置。
+
+    Args:
+        position_strategy: 插入位置策略 ("before-cds" 或 "after-cds")
+        cds_region: CDS 区域信息，包含 start 和 end
+
+    Returns:
+        插入位置的索引
+
+    Raises:
+        ValueError: 当使用不支持的插入策略时
+    """
+    if position_strategy == "before-cds":
+        return cds_region["start"]
+    elif position_strategy == "after-cds":
+        return cds_region["end"]
+    else:
+        raise ValueError(f"不支持的插入位置策略：{position_strategy}")
 
 def insert_watermark(
     genbank_data: Dict[str, Any],
@@ -26,17 +47,20 @@ def insert_watermark(
         genbank_data: 包含 Genbank 数据的字典
         watermark_text: 要插入的水印文本
         algorithm: 水印算法类型 ("plaintext" 或 "encrypted")
-        position: 插入位置 ("before-cds", "after-cds", 或 "smart-selection")
+        position: 插入位置 ("before-cds" 或 "after-cds")
 
     Returns:
         包含处理结果的字典
     
     Raises:
-        NotImplementedError: 当使用不支持的算法或插入位置时
-        ValueError: 当输入数据格式不正确时
+        NotImplementedError: 当使用不支持的算法时
+        ValueError: 当输入数据格式不正确或使用不支持的插入位置时
     """
-    if algorithm != "plaintext" or position != "before-cds":
-        raise NotImplementedError("目前只支持 plaintext + before-cds 模式")
+    if algorithm != "plaintext":
+        raise NotImplementedError("目前只支持 plaintext 模式")
+    
+    if position not in ["before-cds", "after-cds"]:
+        raise ValueError(f"不支持的插入位置：{position}")
 
     # 提取必要的数据
     nucleotide_sequence = genbank_data["genbankInfo"]["nucleotideSequence"]
@@ -44,7 +68,7 @@ def insert_watermark(
     
     # 生成水印序列
     watermark_dna = encoding.encode_text(watermark_text)
-    insert_position = cds_region["start"]
+    insert_position = get_insertion_position(position, cds_region)
     
     # 创建水印后的序列
     watermarked_sequence = create_watermarked_sequence(
@@ -235,19 +259,29 @@ def update_genbank_content(
                 # 如果转换失败，跳过这个特征
                 continue
             
-            if start_pos >= insert_position:
-                start = start_pos + watermark_length
-                end = end_pos + watermark_length
+            # 特殊处理 CDS 特征
+            if feature.type == "CDS" and end_pos == insert_position:
+                # 如果是 CDS 特征且水印插入在其末尾，保持 CDS 长度不变
+                new_location = SimpleLocation(
+                    ExactPosition(start_pos),
+                    ExactPosition(end_pos),
+                    feature.location.strand
+                )
             else:
-                start = start_pos
-                end = end_pos + watermark_length if end_pos >= insert_position else end_pos
+                # 其他特征正常更新位置
+                if start_pos >= insert_position:
+                    start = start_pos + watermark_length
+                    end = end_pos + watermark_length
+                else:
+                    start = start_pos
+                    end = end_pos + watermark_length if end_pos >= insert_position else end_pos
                 
-            # 创建新的位置对象
-            new_location = SimpleLocation(
-                ExactPosition(start),
-                ExactPosition(end),
-                feature.location.strand
-            )
+                new_location = SimpleLocation(
+                    ExactPosition(start),
+                    ExactPosition(end),
+                    feature.location.strand
+                )
+            
             feature.location = new_location
             
             # 确保蛋白质序列的格式正确

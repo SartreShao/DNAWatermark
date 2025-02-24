@@ -22,7 +22,7 @@ def insert_watermark():
         "genbankData": str,          # Genbank 文件内容
         "watermarkMetadata": str,    # 水印文本
         "algorithm": str,            # 水印算法 ("plaintext" 或 "encrypted")
-        "insertionPosition": str,    # 插入位置 ("before-cds", "after-cds", "smart-selection")
+        "insertionPosition": str,    # 插入位置 ("before-cds" 或 "after-cds")
         "genbankInfo": {            # Genbank 信息
             "nucleotideSequence": str,  # 核苷酸序列
             "cdsRegion": {
