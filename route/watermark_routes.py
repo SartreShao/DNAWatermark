@@ -49,7 +49,10 @@ def insert_watermark():
                     "end": int
                 },
                 "sequence": str,           # 水印 DNA 序列
-                "originalText": str        # 原始水印文本
+                "originalText": str,       # 原始水印文本
+                "algorithm": str,          # 使用的算法
+                "salt": str,              # 加密盐值（仅在加密模式下返回）
+                "password": str           # 生成的密码（仅在加密模式下返回）
             },
             "genbankFile": str            # 更新后的 Genbank 文件内容
         },

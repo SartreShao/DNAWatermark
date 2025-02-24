@@ -38,7 +38,8 @@ def insert_watermark(
     genbank_data: Dict[str, Any],
     watermark_text: str,
     algorithm: str = "plaintext",
-    position: str = "before-cds"
+    position: str = "before-cds",
+    password: str | None = None
 ) -> Dict[str, Any]:
     """
     将水印信息插入到基因序列中。
@@ -48,6 +49,7 @@ def insert_watermark(
         watermark_text: 要插入的水印文本
         algorithm: 水印算法类型 ("plaintext" 或 "encrypted")
         position: 插入位置 ("before-cds" 或 "after-cds")
+        password: 加密密码（仅在 algorithm 为 "encrypted" 时需要）
 
     Returns:
         包含处理结果的字典
@@ -56,49 +58,75 @@ def insert_watermark(
         NotImplementedError: 当使用不支持的算法时
         ValueError: 当输入数据格式不正确或使用不支持的插入位置时
     """
-    if algorithm != "plaintext":
-        raise NotImplementedError("目前只支持 plaintext 模式")
-    
-    if position not in ["before-cds", "after-cds"]:
-        raise ValueError(f"不支持的插入位置：{position}")
+    try:
+        print(f"开始处理水印插入，算法：{algorithm}，位置：{position}")  # 调试信息
+        
+        if algorithm not in ["plaintext", "encrypted"]:
+            raise ValueError(f"不支持的算法类型：{algorithm}")
+        
+        if position not in ["before-cds", "after-cds"]:
+            raise ValueError(f"不支持的插入位置：{position}")
 
-    # 提取必要的数据
-    nucleotide_sequence = genbank_data["genbankInfo"]["nucleotideSequence"]
-    cds_region = genbank_data["genbankInfo"]["cdsRegion"]
-    
-    # 生成水印序列
-    watermark_dna = encoding.encode_text(watermark_text)
-    insert_position = get_insertion_position(position, cds_region)
-    
-    # 创建水印后的序列
-    watermarked_sequence = create_watermarked_sequence(
-        nucleotide_sequence,
-        watermark_dna,
-        insert_position
-    )
-    
-    # 生成水印信息
-    watermark_info = create_watermark_info(
-        watermark_text,
-        watermark_dna,
-        insert_position
-    )
-    
-    # 使用 BioPython 更新 Genbank 文件
-    updated_genbank = update_genbank_content(
-        genbank_data["genbankData"],
-        watermark_dna,
-        insert_position
-    )
-    
-    return {
-        "status": "success",
-        "data": {
-            "watermarkedSequence": watermarked_sequence,
-            "watermarkInfo": watermark_info,
-            "genbankFile": updated_genbank
+        # 提取必要的数据
+        nucleotide_sequence = genbank_data["genbankInfo"]["nucleotideSequence"]
+        cds_region = genbank_data["genbankInfo"]["cdsRegion"]
+        
+        print(f"提取的数据 - 序列长度：{len(nucleotide_sequence)}，CDS区域：{cds_region}")  # 调试信息
+        
+        # 生成水印序列
+        if algorithm == "plaintext":
+            print("使用明文算法生成水印")  # 调试信息
+            watermark_dna = encoding.encode_text(watermark_text)
+            salt = None
+        else:  # encrypted
+            print(f"使用加密算法生成水印，密码：{'已提供' if password else '未提供'}")  # 调试信息
+            if not isinstance(password, str):
+                raise ValueError("加密模式需要提供有效的密码字符串")
+            watermark_dna, salt = encoding.encode_encrypted_text(watermark_text, password)
+        
+        print(f"生成的水印序列长度：{len(watermark_dna)}")  # 调试信息
+        
+        insert_position = get_insertion_position(position, cds_region)
+        print(f"插入位置：{insert_position}")  # 调试信息
+        
+        # 创建水印后的序列
+        watermarked_sequence = create_watermarked_sequence(
+            nucleotide_sequence,
+            watermark_dna,
+            insert_position
+        )
+        
+        # 生成水印信息
+        watermark_info = create_watermark_info(
+            watermark_text,
+            watermark_dna,
+            insert_position,
+            algorithm,
+            salt
+        )
+        
+        # 使用 BioPython 更新 Genbank 文件
+        updated_genbank = update_genbank_content(
+            genbank_data["genbankData"],
+            watermark_dna,
+            insert_position,
+            algorithm
+        )
+        
+        print("水印插入处理完成")  # 调试信息
+        
+        return {
+            "status": "success",
+            "data": {
+                "watermarkedSequence": watermarked_sequence,
+                "watermarkInfo": watermark_info,
+                "genbankFile": updated_genbank
+            }
         }
-    }
+        
+    except Exception as e:
+        print(f"水印插入过程中发生错误：{str(e)}")  # 调试信息
+        raise
 
 def create_watermarked_sequence(
     original_sequence: str,
@@ -125,7 +153,9 @@ def create_watermarked_sequence(
 def create_watermark_info(
     original_text: str,
     watermark_dna: str,
-    insert_position: int
+    insert_position: int,
+    algorithm: str,
+    salt: bytes | None = None
 ) -> Dict[str, Any]:
     """
     创建水印信息字典。
@@ -134,23 +164,32 @@ def create_watermark_info(
         original_text: 原始水印文本
         watermark_dna: 编码后的水印 DNA 序列
         insert_position: 插入位置
+        algorithm: 水印算法类型
+        salt: 加密盐值（仅在加密模式下使用）
 
     Returns:
         包含水印信息的字典
     """
-    return {
+    info = {
         "position": {
             "start": insert_position,
             "end": insert_position + len(watermark_dna)
         },
         "sequence": watermark_dna,
-        "originalText": original_text
+        "originalText": original_text,
+        "algorithm": algorithm
     }
+    
+    if salt is not None:
+        info["salt"] = salt.hex()  # 将字节转换为十六进制字符串
+        
+    return info
 
 def update_genbank_content(
     genbank_content: str,
     watermark_dna: str,
-    insert_position: int
+    insert_position: int,
+    algorithm: str
 ) -> str:
     """
     使用 BioPython 更新 Genbank 文件内容。
@@ -159,6 +198,7 @@ def update_genbank_content(
         genbank_content: 原始 Genbank 文件内容
         watermark_dna: 水印 DNA 序列
         insert_position: 插入位置
+        algorithm: 水印算法类型
 
     Returns:
         更新后的 Genbank 文件内容
@@ -241,7 +281,7 @@ def update_genbank_content(
                 f"Length: {watermark_length} bp",
                 f"Sequence: {watermark_dna.lower()}"
             ],
-            "watermark_type": ["plaintext"]
+            "watermark_type": [algorithm]
         }
     )
     new_features.append(watermark_feature)
