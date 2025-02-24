@@ -4,7 +4,13 @@ from flask import Flask
 from flask_cors import CORS
 
 from models.database import Base, engine
-from route import database_routes, watermark_routes, encoding_routes
+from route import (
+    database_routes,
+    watermark_routes,
+    encoding_routes,
+    genbank_routes,
+    health_routes
+)
 
 def create_app():
     """创建Flask应用实例"""
@@ -22,6 +28,8 @@ def create_app():
     app.register_blueprint(watermark_routes.bp)
     app.register_blueprint(database_routes.bp)
     app.register_blueprint(encoding_routes.bp)
+    app.register_blueprint(genbank_routes.bp)
+    app.register_blueprint(health_routes.bp)
     
     return app
 
