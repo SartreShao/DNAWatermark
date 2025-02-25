@@ -9,7 +9,8 @@ from route import (
     watermark_routes,
     encoding_routes,
     genbank_routes,
-    health_routes
+    health_routes,
+    infringement_routes
 )
 
 def create_app():
@@ -30,6 +31,7 @@ def create_app():
     app.register_blueprint(encoding_routes.bp)
     app.register_blueprint(genbank_routes.bp)
     app.register_blueprint(health_routes.bp)
+    app.register_blueprint(infringement_routes.bp)
     
     return app
 

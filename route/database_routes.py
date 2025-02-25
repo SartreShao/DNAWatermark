@@ -145,8 +145,8 @@ def get_all_watermarks():
         # 获取数据库会话
         db = next(get_db())
         
-        # 查询所有记录
-        records = db.query(WatermarkedSequence).all()
+        # 查询所有记录并按创建时间倒序排序
+        records = db.query(WatermarkedSequence).order_by(WatermarkedSequence.created_at.desc()).all()
         
         # 转换为JSON格式
         result = []
