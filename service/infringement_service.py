@@ -94,10 +94,10 @@ def detect_sequence_infringement(sequence: str) -> Dict[str, Any]:
         
         if match_result["matched"]:
             # 处理换行符
-            original_genbank = record.original_genbank.replace('\\n', '\n') if record.original_genbank else None
-            watermarked_genbank = record.watermarked_genbank.replace('\\n', '\n') if record.watermarked_genbank else None
-            original_sequence = record.original_sequence.replace('\\n', '\n') if record.original_sequence else None
-            watermarked_sequence = record.watermarked_sequence.replace('\\n', '\n') if record.watermarked_sequence else None
+            original_genbank = record.original_genbank.replace('\\n', '\n').replace('\n', '\\n') if record.original_genbank else None
+            watermarked_genbank = record.watermarked_genbank.replace('\\n', '\n').replace('\n', '\\n') if record.watermarked_genbank else None
+            original_sequence = record.original_sequence.replace('\\n', '\n').replace('\n', '\\n') if record.original_sequence else None
+            watermarked_sequence = record.watermarked_sequence.replace('\\n', '\n').replace('\n', '\\n') if record.watermarked_sequence else None
             
             matches.append({
                 "record_id": record.id,

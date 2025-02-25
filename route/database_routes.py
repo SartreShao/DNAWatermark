@@ -68,6 +68,13 @@ def insert_watermark():
     """
     try:
         data = request.get_json()
+        
+        # 处理 Genbank 数据中的换行符
+        if "original_genbank" in data:
+            data["original_genbank"] = data["original_genbank"].replace("\r\n", "\n").replace("\r", "\n")
+        if "watermarked_genbank" in data:
+            data["watermarked_genbank"] = data["watermarked_genbank"].replace("\r\n", "\n").replace("\r", "\n")
+            
         record = WatermarkRecord(**data)
         
         # 创建数据库记录
@@ -151,11 +158,12 @@ def get_all_watermarks():
         # 转换为JSON格式
         result = []
         for record in records:
-            # 处理换行符
-            original_genbank = record.original_genbank.replace('\\n', '\n') if record.original_genbank else None
-            watermarked_genbank = record.watermarked_genbank.replace('\\n', '\n') if record.watermarked_genbank else None
-            original_sequence = record.original_sequence.replace('\\n', '\n') if record.original_sequence else None
-            watermarked_sequence = record.watermarked_sequence.replace('\\n', '\n') if record.watermarked_sequence else None
+            # 处理换行符，确保统一格式
+            def normalize_newlines(text):
+                if text:
+                    # 将所有换行符统一为 \n
+                    return text.replace('\\n', '\n').replace('\r\n', '\n').replace('\r', '\n')
+                return text
             
             result.append({
                 "id": record.id,
@@ -167,10 +175,10 @@ def get_all_watermarks():
                 "password": record.password,
                 "watermark_sequence": record.watermark_sequence,
                 "position": record.position,
-                "original_sequence": original_sequence,
-                "watermarked_sequence": watermarked_sequence,
-                "original_genbank": original_genbank,
-                "watermarked_genbank": watermarked_genbank,
+                "original_sequence": normalize_newlines(record.original_sequence),
+                "watermarked_sequence": normalize_newlines(record.watermarked_sequence),
+                "original_genbank": normalize_newlines(record.original_genbank),
+                "watermarked_genbank": normalize_newlines(record.watermarked_genbank),
                 "genbank_accession": record.genbank_accession,
                 "genbank_organism": record.genbank_organism,
                 "genbank_definition": record.genbank_definition
